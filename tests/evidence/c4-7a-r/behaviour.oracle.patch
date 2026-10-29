@@ -1,0 +1,11 @@
+--- a/rust/processing/src/discovery.rs
++++ b/rust/processing/src/discovery.rs
+@@ -96,7 +96,7 @@
+             let maps = record_refs_at(content.get(*start..*end).unwrap_or_default(),
+                 ifc_lite_core::slot::IfcTypeProduct::REPRESENTATION_MAPS.index());
+             let maps = plan_type_geometry(&maps, &referenced_representation_maps,
+-                false, mode);
++                instantiated_type_ids.contains(id), mode);
+             products.push((*id, *start, *end, ty.clone(), maps));
+         }
+         Self { mode, referenced_representation_maps, instantiated_type_ids, mapped_item_plan, products }

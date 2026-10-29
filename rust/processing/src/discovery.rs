@@ -14,6 +14,7 @@ use crate::element::{plan_type_geometry, TypeGeometryMode};
 /// One file's type-geometry decisions. The mode is explicit because exports
 /// suppress instantiated types while the viewer tags them for its Types view.
 pub struct TypeGeometryPlan {
+    pub mode: TypeGeometryMode,
     pub referenced_representation_maps: FxHashSet<u32>,
     pub instantiated_type_ids: FxHashSet<u32>,
     pub mapped_item_plan: FxHashMap<u32, (u32, u32)>,
@@ -21,6 +22,33 @@ pub struct TypeGeometryPlan {
 }
 
 impl TypeGeometryPlan {
+    pub fn from_file(content: &[u8], decoder: &mut ifc_lite_core::EntityDecoder, mode: TypeGeometryMode) -> Self {
+        let mut mapped = Vec::new();
+        let mut defines = Vec::new();
+        let mut candidates = Vec::new();
+        let mut scanner = ifc_lite_core::EntityScanner::new(content);
+        while let Some((id, name, start, end)) = scanner.next_entity() {
+            if ifc_lite_core::keyword_eq(name, "IFCMAPPEDITEM") {
+                mapped.push((id, start, end));
+            } else if ifc_lite_core::keyword_eq(name, "IFCRELDEFINESBYTYPE") {
+                defines.push((id, start, end));
+            } else if let Some(ty) = ifc_lite_core::type_product_ifc_type(name) {
+                candidates.push((id, start, end, ty));
+            }
+        }
+        Self::from_spans(content, &mapped, &defines, &candidates, decoder, mode)
+    }
+
+    pub fn from_sets(referenced_representation_maps: FxHashSet<u32>, instantiated_type_ids: FxHashSet<u32>, mode: TypeGeometryMode) -> Self {
+        Self { mode, referenced_representation_maps, instantiated_type_ids,
+            mapped_item_plan: FxHashMap::default(), products: Vec::new() }
+    }
+
+    pub fn maps_for(&self, id: u32, maps: &[u32]) -> Vec<(u32, u8)> {
+        plan_type_geometry(maps, &self.referenced_representation_maps,
+            self.instantiated_type_ids.contains(&id), self.mode)
+    }
+
     pub fn from_scan(types: TypeScan, mapped_item_plan: FxHashMap<u32, (u32, u32)>, mode: TypeGeometryMode) -> Self {
         let TypeScan { products, referenced_representation_maps, instantiated_type_ids } = types;
         let products = products.into_iter().map(|(id, start, end, ty, maps)| {
@@ -28,7 +56,7 @@ impl TypeGeometryPlan {
                 instantiated_type_ids.contains(&id), mode);
             (id, start, end, ty, maps)
         }).collect();
-        Self { referenced_representation_maps, instantiated_type_ids,
+        Self { mode, referenced_representation_maps, instantiated_type_ids,
             mapped_item_plan, products }
     }
 
@@ -71,7 +99,7 @@ impl TypeGeometryPlan {
                 instantiated_type_ids.contains(id), mode);
             products.push((*id, *start, *end, ty.clone(), maps));
         }
-        Self { referenced_representation_maps, instantiated_type_ids, mapped_item_plan, products }
+        Self { mode, referenced_representation_maps, instantiated_type_ids, mapped_item_plan, products }
     }
 
     pub fn jobs(&self) -> Vec<(u32, usize, usize, IfcType)> {

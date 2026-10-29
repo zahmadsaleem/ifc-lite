@@ -1,8 +1,8 @@
 --- a/rust/processing/src/discovery.rs
 +++ b/rust/processing/src/discovery.rs
-@@ -96,7 +96,7 @@
-             let maps = record_refs_at(content.get(*start..*end).unwrap_or_default(),
+@@ -94,7 +94,7 @@
                  ifc_lite_core::slot::IfcTypeProduct::REPRESENTATION_MAPS.index());
+             if maps.is_empty() { continue; }
              let maps = plan_type_geometry(&maps, &referenced_representation_maps,
 -                false, mode);
 +                instantiated_type_ids.contains(id), mode);

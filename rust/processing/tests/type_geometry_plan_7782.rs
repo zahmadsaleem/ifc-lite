@@ -36,10 +36,16 @@ fn compare(content: &[u8], mode: TypeGeometryMode) -> TypeGeometryPlan {
         assert_eq!(native.referenced_representation_maps, plan.referenced_representation_maps);
         assert_eq!(native.instantiated_type_ids, plan.instantiated_type_ids);
         assert_eq!(native.mapped_item_plan, plan.mapped_item_plan);
+        for (id, _, _, _, maps) in &native.products {
+            let authored: Vec<_> = maps.iter().map(|(map, _)| *map).collect();
+            assert_eq!(native.maps_for(*id, &authored), plan.maps_for(*id, &authored));
+        }
+    }
+    {
         let shape = |p: &TypeGeometryPlan| p.products.iter()
             .map(|(id, _, _, _, maps)| (*id, maps.clone())).collect::<Vec<_>>();
-        assert_eq!(shape(&native), shape(plan));
-        assert_eq!(native.jobs(), plan.jobs());
+        assert_eq!(shape(&native), shape(&browser));
+        assert_eq!(native.jobs(), browser.jobs());
     }
     browser
 }

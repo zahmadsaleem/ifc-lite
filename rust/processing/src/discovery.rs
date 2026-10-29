@@ -25,18 +25,15 @@ impl TypeGeometryPlan {
     pub fn from_file(content: &[u8], decoder: &mut ifc_lite_core::EntityDecoder, mode: TypeGeometryMode) -> Self {
         let mut mapped = Vec::new();
         let mut defines = Vec::new();
-        let mut candidates = Vec::new();
         let mut scanner = ifc_lite_core::EntityScanner::new(content);
         while let Some((id, name, start, end)) = scanner.next_entity() {
             if ifc_lite_core::keyword_eq(name, "IFCMAPPEDITEM") {
                 mapped.push((id, start, end));
             } else if ifc_lite_core::keyword_eq(name, "IFCRELDEFINESBYTYPE") {
                 defines.push((id, start, end));
-            } else if let Some(ty) = ifc_lite_core::type_product_ifc_type(name) {
-                candidates.push((id, start, end, ty));
             }
         }
-        Self::from_spans(content, &mapped, &defines, &candidates, decoder, mode)
+        Self::from_spans(content, &mapped, &defines, &[], decoder, mode)
     }
 
     pub fn from_sets(referenced_representation_maps: FxHashSet<u32>, instantiated_type_ids: FxHashSet<u32>, mode: TypeGeometryMode) -> Self {
@@ -95,6 +92,7 @@ impl TypeGeometryPlan {
             if decoder.decode_at_with_id(*id, *start, *end).is_err() { continue; }
             let maps = record_refs_at(content.get(*start..*end).unwrap_or_default(),
                 ifc_lite_core::slot::IfcTypeProduct::REPRESENTATION_MAPS.index());
+            if maps.is_empty() { continue; }
             let maps = plan_type_geometry(&maps, &referenced_representation_maps,
                 instantiated_type_ids.contains(id), mode);
             products.push((*id, *start, *end, ty.clone(), maps));

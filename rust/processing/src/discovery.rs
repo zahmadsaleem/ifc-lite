@@ -37,7 +37,11 @@ impl TypeGeometryPlan {
         Self::from_spans(content, &mapped, &defines, &[], decoder, mode)
     }
 
-    pub fn from_sets(referenced_representation_maps: FxHashSet<u32>, instantiated_type_ids: FxHashSet<u32>, mode: TypeGeometryMode) -> Self {
+    pub fn from_sets(
+        referenced_representation_maps: FxHashSet<u32>,
+        instantiated_type_ids: FxHashSet<u32>,
+        mode: TypeGeometryMode,
+    ) -> Self {
         Self { mode, referenced_representation_maps, instantiated_type_ids,
             mapped_item_plan: FxHashMap::default(), products: Vec::new() }
     }

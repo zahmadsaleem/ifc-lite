@@ -179,7 +179,8 @@ pub struct IfcAPI {
     /// cleared by `clearPrePassCache`.
     cached_instantiated_type_ids:
         std::sync::Mutex<Option<std::sync::Arc<rustc_hash::FxHashSet<u32>>>>,
-    cached_type_geometry_plan: std::sync::Mutex<Option<std::sync::Arc<ifc_lite_processing::discovery::TypeGeometryPlan>>>,
+    cached_type_geometry_plan:
+        std::sync::Mutex<Option<std::sync::Arc<ifc_lite_processing::discovery::TypeGeometryPlan>>>,
 
     /// #1623 Phase 3 don't-bake plan: `IfcRepresentationMap` id ⇒ `(count, min-id)`
     /// for every source an `IfcMappedItem` instantiates >= 2 times (the streaming

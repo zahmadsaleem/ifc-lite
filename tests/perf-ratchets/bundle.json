@@ -22,14 +22,14 @@
       "metric": "raw-bytes",
       "unit": "bytes",
       "description": "raw size of the single <script type=\"module\" src> chunk of apps/viewer/dist/index.html",
-      "ceiling": 3120770,
+      "ceiling": 3071297,
       "tolerance": {
         "kind": "relative",
         "value": 0.001
       },
       "provenance": {
-        "commit": "299f37b14a5ccbbaab2e675ca4bdc2ecd7d7cf23",
-        "measuredAt": "2026-10-19T16:28:51.000Z"
+        "commit": "e62a506dd6cacec073c6d4e2f1268141784d3445",
+        "measuredAt": "2026-10-29T09:05:22.255Z"
       }
     },
     {

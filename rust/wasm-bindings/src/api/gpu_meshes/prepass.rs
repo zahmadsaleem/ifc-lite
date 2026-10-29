@@ -419,9 +419,16 @@ impl IfcAPI {
         // workers apply messages FIFO, so the injected data is always in place
         // before any `processGeometryBatch` — the lazy per-worker build (the
         // byte-identical fallback) never fires on the streaming path.
+        let type_candidates = if !skip_type_geometry
+            && ifc_lite_core::find_keyword(content, b"IFCREPRESENTATIONMAP").is_some()
+        {
+            type_candidate_spans.as_slice()
+        } else {
+            &[]
+        };
         let type_plan = ifc_lite_processing::discovery::TypeGeometryPlan::from_spans(
             content, &mapped_item_spans, &prepass_spans.defines_by_type,
-            &type_candidate_spans, &mut decoder,
+            type_candidates, &mut decoder,
             ifc_lite_processing::element::TypeGeometryMode::EmitTagged,
         );
         // #1623 Phase 3 don't-bake plan: the RepresentationMap ids an IfcMappedItem

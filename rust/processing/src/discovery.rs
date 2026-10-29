@@ -13,12 +13,13 @@ use crate::element::{plan_type_geometry, TypeGeometryMode};
 
 /// One file's type-geometry decisions. The mode is explicit because exports
 /// suppress instantiated types while the viewer tags them for its Types view.
+pub type PlannedTypeProduct = (u32, usize, usize, IfcType, Vec<(u32, u8)>);
 pub struct TypeGeometryPlan {
     pub mode: TypeGeometryMode,
     pub referenced_representation_maps: FxHashSet<u32>,
     pub instantiated_type_ids: FxHashSet<u32>,
     pub mapped_item_plan: FxHashMap<u32, (u32, u32)>,
-    pub products: Vec<(u32, usize, usize, IfcType, Vec<(u32, u8)>)>,
+    pub products: Vec<PlannedTypeProduct>,
 }
 
 impl TypeGeometryPlan {

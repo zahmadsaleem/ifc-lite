@@ -53,8 +53,21 @@ fn compare(content: &[u8], mode: TypeGeometryMode) -> TypeGeometryPlan {
 #[test]
 fn issue_7782_type_plan_modes_and_fallback_agree() {
     for content in [
-        include_bytes!("fixtures/c4_type_geometry_modes_7782.ifc").as_slice(),
+        include_bytes!("fixtures/c4_0_refusal_parity_7782.ifc").as_slice(),
         include_bytes!("fixtures/c4_bare_type_map_7782.ifc").as_slice(),
+        include_bytes!("fixtures/c4_native_unsliced_layers_7782.ifc").as_slice(),
+        include_bytes!("fixtures/c4_type_geometry_modes_7782.ifc").as_slice(),
+        include_bytes!("fixtures/issue_1781_image_textures.ifc").as_slice(),
+        include_bytes!("../../geometry/tests/fixtures/issue_1910_building_shell_geometry.ifc").as_slice(),
+        include_bytes!("fixtures/issue_2019_wall_two_overlapping_openings.ifc").as_slice(),
+        include_bytes!("fixtures/issue_3641_voiding_trap.ifc").as_slice(),
+        include_bytes!("../../geometry/tests/fixtures/issue_4560_wall_roof_polygonal_cutters.ifc").as_slice(),
+        include_bytes!("fixtures/issue_6601_multicolor_element.ifc").as_slice(),
+        include_bytes!("../../geometry/tests/fixtures/mapped_instances_indexed_colour.ifc").as_slice(),
+        include_bytes!("../../geometry/tests/fixtures/mapped_instances_indexed_colour_uniform.ifc").as_slice(),
+        include_bytes!("../../geometry/tests/fixtures/mapped_instances_site_rotated.ifc").as_slice(),
+        include_bytes!("../../geometry/tests/fixtures/mapped_instances_site_translated.ifc").as_slice(),
+        include_bytes!("../../geometry/tests/fixtures/mapped_instances_synthetic.ifc").as_slice(),
     ] {
         let native = compare(content, TypeGeometryMode::SuppressInstanced);
         let browser = compare(content, TypeGeometryMode::EmitTagged);

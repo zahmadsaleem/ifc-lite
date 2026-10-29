@@ -32,6 +32,25 @@ fn assert_match(content: &[u8]) -> usize {
     let mut d2 = EntityDecoder::with_arc_index(content, index);
     let new = collect_type_geometry_jobs_from_spans(content, &mapped, &cands, &mut d2);
     assert_eq!(old, new, "orphan type jobs diverged for {} input bytes", content.len());
+    for mode in [
+        ifc_lite_processing::element::TypeGeometryMode::EmitTagged,
+        ifc_lite_processing::element::TypeGeometryMode::SuppressInstanced,
+    ] {
+        let mut d3 = EntityDecoder::with_index(content, build_entity_index(content));
+        let plan = ifc_lite_processing::discovery::TypeGeometryPlan::from_spans(
+            content, &mapped, &[], &cands, &mut d3, mode,
+        );
+        if mode == ifc_lite_processing::element::TypeGeometryMode::EmitTagged {
+            assert_eq!(new, plan.jobs());
+        }
+        let mut d4 = EntityDecoder::with_index(content, build_entity_index(content));
+        let fallback = ifc_lite_processing::discovery::TypeGeometryPlan::from_file(
+            content, &mut d4, mode,
+        );
+        assert_eq!(plan.referenced_representation_maps, fallback.referenced_representation_maps);
+        assert_eq!(plan.instantiated_type_ids, fallback.instantiated_type_ids);
+        assert_eq!(plan.mapped_item_plan, fallback.mapped_item_plan);
+    }
     old.len()
 }
 
@@ -41,6 +60,7 @@ fn c4_7a_7782_bare_type_map_matches_native_and_typed_wrapper_is_refused() {
     assert_eq!(assert_match(source.as_bytes()), 1);
     let wrapped = source.replace("#44,$,$,.NOTDEFINED.", "IFCREPRESENTATIONMAP(#44),$,$,.NOTDEFINED.");
     assert_eq!(assert_match(wrapped.as_bytes()), 0);
+    assert_eq!(assert_match(include_bytes!("../../../../processing/tests/fixtures/c4_type_geometry_modes_7782.ifc")), 2);
 }
 
 // An IfcColumnType carrying a RepresentationMap that NO IfcMappedItem

@@ -9,6 +9,83 @@ use ifc_lite_core::{
     IfcType, StepListItems,
 };
 use rustc_hash::{FxHashMap, FxHashSet};
+use crate::element::{plan_type_geometry, TypeGeometryMode};
+
+/// One file's type-geometry decisions. The mode is explicit because exports
+/// suppress instantiated types while the viewer tags them for its Types view.
+pub struct TypeGeometryPlan {
+    pub referenced_representation_maps: FxHashSet<u32>,
+    pub instantiated_type_ids: FxHashSet<u32>,
+    pub mapped_item_plan: FxHashMap<u32, (u32, u32)>,
+    pub products: Vec<(u32, usize, usize, IfcType, Vec<(u32, u8)>)>,
+}
+
+impl TypeGeometryPlan {
+    pub fn from_scan(types: TypeScan, mapped_item_plan: FxHashMap<u32, (u32, u32)>, mode: TypeGeometryMode) -> Self {
+        let TypeScan { products, referenced_representation_maps, instantiated_type_ids } = types;
+        let products = products.into_iter().map(|(id, start, end, ty, maps)| {
+            let maps = plan_type_geometry(&maps, &referenced_representation_maps,
+                instantiated_type_ids.contains(&id), mode);
+            (id, start, end, ty, maps)
+        }).collect();
+        Self { referenced_representation_maps, instantiated_type_ids,
+            mapped_item_plan, products }
+    }
+
+    /// Browser spans are decoded with the full decoder. A type record rejected
+    /// there is intentionally omitted, even if the scan-time parser accepts it.
+    pub fn from_spans(
+        content: &[u8], mapped: &[(u32, usize, usize)],
+        defines: &[(u32, usize, usize)],
+        candidates: &[(u32, usize, usize, IfcType)],
+        decoder: &mut ifc_lite_core::EntityDecoder,
+        mode: TypeGeometryMode,
+    ) -> Self {
+        let mut referenced_representation_maps = FxHashSet::default();
+        let mut instantiated_type_ids = FxHashSet::default();
+        let mut mapped_item_plan: FxHashMap<u32, (u32, u32)> = FxHashMap::default();
+        for &(id, start, end) in mapped {
+            if let Ok(entity) = decoder.decode_at_with_id(id, start, end) {
+                if let Some(source) = entity.get_ref(ifc_lite_core::slot::IfcMappedItem::MAPPING_SOURCE.index()) {
+                    referenced_representation_maps.insert(source);
+                    mapped_item_plan.entry(source).and_modify(|(count, min)| {
+                        *count += 1;
+                        *min = (*min).min(id);
+                    }).or_insert((1, id));
+                }
+            }
+        }
+        for &(id, start, end) in defines {
+            if let Ok(entity) = decoder.decode_at_with_id(id, start, end) {
+                if let Some(ty) = entity.get_ref(ifc_lite_core::slot::IfcRelDefinesByType::RELATING_TYPE.index()) {
+                    instantiated_type_ids.insert(ty);
+                }
+            }
+        }
+        let mut products = Vec::new();
+        for (id, start, end, ty) in candidates {
+            if decoder.decode_at_with_id(*id, *start, *end).is_err() { continue; }
+            let maps = record_refs_at(content.get(*start..*end).unwrap_or_default(),
+                ifc_lite_core::slot::IfcTypeProduct::REPRESENTATION_MAPS.index());
+            let maps = plan_type_geometry(&maps, &referenced_representation_maps,
+                instantiated_type_ids.contains(id), mode);
+            products.push((*id, *start, *end, ty.clone(), maps));
+        }
+        Self { referenced_representation_maps, instantiated_type_ids, mapped_item_plan, products }
+    }
+
+    pub fn jobs(&self) -> Vec<(u32, usize, usize, IfcType)> {
+        self.products.iter().filter(|(_, _, _, _, maps)| !maps.is_empty())
+            .map(|(id, start, end, ty, _)| (*id, *start, *end, ty.clone())).collect()
+    }
+
+    pub fn browser_instance_sources(&self) -> Vec<u32> {
+        let mut ids: Vec<_> = self.mapped_item_plan.iter()
+            .filter(|(_, (count, _))| *count >= 2).map(|(&id, _)| id).collect();
+        ids.sort_unstable();
+        ids
+    }
+}
 
 /// #957: type-product geometry (IfcXxxType + its RepresentationMaps) and the
 /// set of RepresentationMaps already instantiated by an IfcMappedItem. After

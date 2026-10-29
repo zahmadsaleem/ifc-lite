@@ -111,7 +111,7 @@ pub(crate) fn collect_type_geometry_jobs(
     content: &[u8],
     decoder: &mut ifc_lite_core::EntityDecoder,
 ) -> Vec<(u32, usize, usize, ifc_lite_core::IfcType)> {
-    use ifc_lite_core::{keyword_eq, EntityScanner, IfcType};
+    use ifc_lite_core::{keyword_eq, EntityScanner};
 
     // Fast bail-out: type geometry can only exist when the file authors at least
     // one IfcRepresentationMap. The overwhelming majority of files pay only a
@@ -120,40 +120,17 @@ pub(crate) fn collect_type_geometry_jobs(
         return Vec::new();
     }
 
-    // Single pass: gather the IfcMappedItem-referenced RepresentationMaps and the
-    // type-product candidates, then drop types whose maps are all referenced
-    // (those are drawn through their occurrence's mapped representation). The
-    // orphan-vs-instanced class is assigned later, in the render loop.
-    let mut referenced: rustc_hash::FxHashSet<u32> = rustc_hash::FxHashSet::default();
-    let mut candidates: Vec<(u32, usize, usize, IfcType, Vec<u32>)> = Vec::new();
-
+    let mut mapped = Vec::new();
+    let mut candidates = Vec::new();
     let mut scanner = EntityScanner::new(content);
     while let Some((id, type_name, start, end)) = scanner.next_entity() {
         if keyword_eq(type_name, "IFCMAPPEDITEM") {
-            if let Ok(entity) = decoder.decode_at_with_id(id, start, end) {
-                // IfcMappedItem.MappingSource = attr 0.
-                if let Some(source_id) = entity.get_ref(0) {
-                    referenced.insert(source_id);
-                }
-            }
-        } else if let Some(ifc_type) = ifc_lite_core::type_product_ifc_type(type_name) {
-            if decoder.decode_at_with_id(id, start, end).is_ok() {
-                // IfcTypeProduct.RepresentationMaps = attr 6.
-                let rep_maps = ifc_lite_processing::discovery::record_refs_at(
-                    &content[start..end], ifc_lite_core::slot::IfcTypeProduct::REPRESENTATION_MAPS.index(),
-                );
-                if !rep_maps.is_empty() {
-                    candidates.push((id, start, end, ifc_type, rep_maps));
-                }
-            }
+            mapped.push((id, start, end));
+        } else if let Some(ty) = ifc_lite_core::type_product_ifc_type(type_name) {
+            candidates.push((id, start, end, ty));
         }
     }
-
-    candidates
-        .into_iter()
-        .filter(|(_, _, _, _, maps)| maps.iter().any(|rm| !referenced.contains(rm)))
-        .map(|(id, start, end, ifc_type, _)| (id, start, end, ifc_type))
-        .collect()
+    collect_type_geometry_jobs_from_spans(content, &mapped, &candidates, decoder)
 }
 
 /// Span-based twin of [`collect_type_geometry_jobs`]. The streaming pre-pass
@@ -170,32 +147,10 @@ pub(crate) fn collect_type_geometry_jobs_from_spans(
     type_candidate_spans: &[(u32, usize, usize, ifc_lite_core::IfcType)],
     decoder: &mut ifc_lite_core::EntityDecoder,
 ) -> Vec<(u32, usize, usize, ifc_lite_core::IfcType)> {
-    let mut referenced: rustc_hash::FxHashSet<u32> = rustc_hash::FxHashSet::default();
-    for &(id, start, end) in mapped_item_spans {
-        if let Ok(entity) = decoder.decode_at_with_id(id, start, end) {
-            if let Some(source_id) = entity.get_ref(0) {
-                referenced.insert(source_id);
-            }
-        }
-    }
-
-    let mut candidates: Vec<(u32, usize, usize, ifc_lite_core::IfcType, Vec<u32>)> = Vec::new();
-    for (id, start, end, ifc_type) in type_candidate_spans {
-        if decoder.decode_at_with_id(*id, *start, *end).is_ok() {
-            let rep_maps = ifc_lite_processing::discovery::record_refs_at(
-                &content[*start..*end], ifc_lite_core::slot::IfcTypeProduct::REPRESENTATION_MAPS.index(),
-            );
-            if !rep_maps.is_empty() {
-                candidates.push((*id, *start, *end, ifc_type.clone(), rep_maps));
-            }
-        }
-    }
-
-    candidates
-        .into_iter()
-        .filter(|(_, _, _, _, maps)| maps.iter().any(|rm| !referenced.contains(rm)))
-        .map(|(id, start, end, ifc_type, _)| (id, start, end, ifc_type))
-        .collect()
+    ifc_lite_processing::discovery::TypeGeometryPlan::from_spans(
+        content, mapped_item_spans, &[], type_candidate_spans, decoder,
+        ifc_lite_processing::element::TypeGeometryMode::EmitTagged,
+    ).jobs()
 }
 
 /// #957: the set of `RepresentationMap`s instantiated by an `IfcMappedItem`, so

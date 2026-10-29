@@ -20,11 +20,14 @@ fn assert_match(content: &[u8]) -> usize {
     let mut d1 = EntityDecoder::with_arc_index(content, index.clone());
     let old = collect_type_geometry_jobs(content, &mut d1);
     let mut mapped: Vec<(u32, usize, usize)> = Vec::new();
+    let mut defines: Vec<(u32, usize, usize)> = Vec::new();
     let mut cands: Vec<(u32, usize, usize, IfcType)> = Vec::new();
     let mut sc = EntityScanner::new(content);
     while let Some((id, tn, st, en)) = sc.next_entity() {
         if tn == "IFCMAPPEDITEM" {
             mapped.push((id, st, en));
+        } else if tn == "IFCRELDEFINESBYTYPE" {
+            defines.push((id, st, en));
         } else if let Some(t) = ifc_lite_core::type_product_ifc_type(tn) {
             cands.push((id, st, en, t));
         }
@@ -38,7 +41,7 @@ fn assert_match(content: &[u8]) -> usize {
     ] {
         let mut d3 = EntityDecoder::with_index(content, build_entity_index(content));
         let plan = ifc_lite_processing::discovery::TypeGeometryPlan::from_spans(
-            content, &mapped, &[], &cands, &mut d3, mode,
+            content, &mapped, &defines, &cands, &mut d3, mode,
         );
         if mode == ifc_lite_processing::element::TypeGeometryMode::EmitTagged {
             assert_eq!(new, plan.jobs());

@@ -4,11 +4,13 @@
 
 import { ScopedTokens } from './scoped-tokens';
 import { redeemRegistryShare } from './share-exchange';
-import { grantAllows } from './grants';
+import { grantAllows, type RegistryGrant } from './grants';
 import { localRegistryAddress } from './connection';
 import { discoverRegistryOAuth, registryOAuthLogin } from './oauth';
 import { exchangeRegistrySession, revokeRegistrySession } from './session-exchange';
 import { RegistryError, repositoryName, type RegistrySession, type RegistryAuthorization } from './protocol';
+import { bindOpenArtifact, launchAllows } from './open-artifact-contract';
+import { finishRegistryLaunch } from './open-artifact-oauth';
 
 /** Registry-owned PKCE sign-in and scoped Bearer requests. No persistent secrets. */
 export class RegistryTransport {
@@ -18,6 +20,7 @@ export class RegistryTransport {
   private attempt: AbortController | null = null;
   private current: RegistrySession | null = null;
   private authorization: RegistryAuthorization | null = null;
+  private launchPermissions: RegistryGrant[] | null = null;
   private renewing: AbortController | null = null;
   private refreshing: Promise<RegistrySession> | null = null;
   private restoring: Promise<RegistrySession | null> | null = null;
@@ -37,6 +40,7 @@ export class RegistryTransport {
 
   get session(): RegistrySession | null { return this.current; }
   can(action: 'pull' | 'push', repository = this.current?.repository, tag?: string): boolean {
+    if (this.current?.openArtifact && (!repository || !launchAllows(this.current.openArtifact, repository, action, tag) || !grantAllows(this.launchPermissions ?? [], repository, action, tag))) return false;
     return Boolean(this.current && !this.pendingRevoke && this.current.sessionExpiresAt > Date.now() && (repository ? (this.current.permissions ? grantAllows(this.current.permissions, repository, action, tag) : this.current.repositories.some(access => access.repository === repository && access.actions.includes(action))) : this.current.permissions?.some(g => g.actions.includes(action)) || this.current.repositories.some(a => a.actions.includes(action))));
   }
   logout(notify = true): void {
@@ -45,6 +49,7 @@ export class RegistryTransport {
     this.renewing?.abort(); this.renewing = null; this.refreshing = null; this.restoring = null;
     this.scoped.clear();
     this.token = null; this.current = null; this.authorization = null; this.suppressedRestore = true;
+    this.launchPermissions = null;
     this.channel?.close(); this.channel = null;
     if (notify) this.onSession?.(null);
   }
@@ -54,8 +59,10 @@ export class RegistryTransport {
     if (previous) {
       if (previous.session.subject !== authorization.session.subject || previous.session.remembered !== authorization.session.remembered) throw new RegistryError('The registry session identity changed. Please sign in again.', 403);
       authorization.session.sessionExpiresAt = Math.min(previous.session.sessionExpiresAt, authorization.session.sessionExpiresAt);
+      if (previous.session.openArtifact) bindOpenArtifact(authorization, previous.session.openArtifact);
     }
     this.scoped.clear();
+    if (!previous && authorization.session.openArtifact) this.launchPermissions = authorization.session.permissions ?? [];
     this.authorization = authorization; this.token = authorization.token; this.current = authorization.session; this.suppressedRestore = false;
     if (!this.channel && typeof BroadcastChannel !== 'undefined') {
       this.channel = new BroadcastChannel('ifc-lite:registry-session');
@@ -176,8 +183,25 @@ export class RegistryTransport {
     return this.accept(authorization, generation);
   }
 
+  /** Accept a launch without replacing its limited authorization with catalog login. */
+  async finishLaunch(href: string, signal: AbortSignal): Promise<RegistrySession> {
+    if (this.pendingRevoke) throw new RegistryError('Finish signing out before opening another version.');
+    this.logout(); const generation = this.generation;
+    const attempt = new AbortController(); this.attempt = attempt;
+    const abort = () => attempt.abort(signal.reason);
+    signal.throwIfAborted(); signal.addEventListener('abort', abort, { once: true });
+    try {
+      const authorization = await finishRegistryLaunch(href, attempt.signal, this.registryOrigin, this.origin);
+      attempt.signal.throwIfAborted();
+      return this.accept(authorization, generation);
+    } finally {
+      signal.removeEventListener('abort', abort);
+      if (this.attempt === attempt) this.attempt = null;
+    }
+  }
+
   async shareRequest(path: string, init: RequestInit = {}): Promise<unknown> {
-    if (!this.current || this.current.authorizationType !== 'session' || !/^\/shares(?:\/[0-9a-f-]+\/revoke)?$/.test(path)) throw new RegistryError('Sign in as an account to manage shares.', 403);
+    if (!this.current || this.current.openArtifact || this.current.authorizationType !== 'session' || !/^\/shares(?:\/[0-9a-f-]+\/revoke)?$/.test(path)) throw new RegistryError('Sign in as an account to manage shares.', 403);
     if (this.current.expiresAt <= Date.now() + 30000) await this.renew();
     const generation = this.generation;
     const response = await fetch(this.url(path), { ...init, headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${this.token}` }, credentials: 'omit', redirect: 'error', cache: 'no-store' });

@@ -167,6 +167,63 @@ during listing. Authorization, connection and server failures remain visible.
 Derived releases may include larger non-IFC layers; the 512 MiB download limit
 applies to the selected IFC source.
 
+## Open a version from the registry
+
+The experimental viewer also receives `open-artifact/1` launches at
+`/open-artifact`. Enable the registry connection as above and register this
+application on a registry supporting the Open Artifact contract:
+
+```json
+{
+  "version": 1,
+  "profiles": [{
+    "id": "urn:ifc-lite:ifc-step:1",
+    "artifact_type": "application/vnd.ifc-lite.ifc.v1",
+    "config_media_type": "application/vnd.oci.empty.v1+json"
+  }],
+  "applications": [{
+    "id": "ifc-lite-open-artifact",
+    "name": "IFClite",
+    "launch_url": "http://localhost:3000/open-artifact",
+    "redirect_uris": ["http://localhost:3000/open-artifact/callback"],
+    "cors_origins": ["http://localhost:3000"],
+    "supports": [{
+      "profile": "urn:ifc-lite:ifc-step:1",
+      "intents": ["view", "edit"],
+      "publish": true
+    }]
+  }]
+}
+```
+
+Replace the viewer origin with its actual development address. The issuer in
+the launch must match `IFC_REGISTRY_TARGET` exactly, including host and port;
+launches cannot change the proxy destination. This receiver retains the demo's
+configured loopback HTTP registry boundary.
+
+Choose a version and **Open with…** or **Edit with…** in the registry, select
+IFClite, and approve access on the registry. IFClite uses its own PKCE verifier
+and registered callback. Callback parameters are removed before viewer startup.
+Only the pending verifier and state survive the authorization redirect in tab
+session storage; they are consumed on return. Access and refresh tokens stay
+in memory. Reloading the viewer requires opening the version from the registry
+again.
+
+The viewer validates the profile and manifest, verifies the selected digest and
+IFC bytes, and loads the model through the ordinary IFC loader. A launch never
+needs catalog or tag browsing. Its source stays pinned through renewal and its
+original deadline cannot be extended.
+
+Cloud Sources opens with the received version. The selected intent sets the
+viewer’s initial Edit mode. View access hides publication.
+When editing and publication are authorized, choose **Save to** and a new
+version name there. The registry-issued permissions constrain both fields;
+publication exports the complete opened model with its edits. Other active
+models cannot accidentally be published through this launch. Saving to a
+write-only destination does not probe its blobs or require reading the new
+version afterward. Existing versions remain immutable. Use the registry to
+open a saved version that the launch cannot read.
+
 ## Expiring shares
 
 Choose **Manage shares** while signed in as an account. A share defaults to the

@@ -42,8 +42,8 @@ export async function revokeRegistrySession(origin: string, registryOrigin: stri
   }, signal);
 }
 
-export function validateRegistrySessionConfig(value: object): void {
-  if (!('refresh_cookie_name' in value) || value.refresh_cookie_name !== REGISTRY_REFRESH_COOKIE ||
+export function validateRegistrySessionConfig(value: object, memoryOnly = false): void {
+  if ((!memoryOnly && (!('refresh_cookie_name' in value) || value.refresh_cookie_name !== REGISTRY_REFRESH_COOKIE)) ||
     !('revocation_endpoint' in value) || value.revocation_endpoint !== '/oauth/revoke' ||
     !('session_max_age' in value) || value.session_max_age !== 8 * 3600 ||
     !('remembered_session_max_age' in value) || value.remembered_session_max_age !== 30 * 24 * 3600) {

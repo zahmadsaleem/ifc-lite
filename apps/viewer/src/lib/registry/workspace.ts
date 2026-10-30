@@ -9,6 +9,7 @@ import { RegistryTransport } from './transport';
 import type { RegistrySession } from './protocol';
 
 interface RegistryWorkspace {
+  launchModelId?: string;
   address: string;
   models: string[];
   modelTitles: Record<string, string>;
@@ -25,6 +26,7 @@ interface RegistryWorkspace {
 }
 
 const initial: RegistryWorkspace = {
+  launchModelId: undefined,
   address: localRegistryAddress, catalogNext: undefined, models: [], modelTitles: {}, releases: [], transport: null, session: null, repository: '', release: '',
   version: 'revision-2', tags: [], fingerprint: '', published: '',
 };

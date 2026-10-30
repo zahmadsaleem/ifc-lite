@@ -13,6 +13,7 @@ import { useIfcLoader } from '@/hooks/useIfcLoader';
 import { sanitizeFilename } from '@/lib/export/download';
 import { RegistryError } from '@/lib/registry/protocol';
 import { parseRegistryAddress } from '@/lib/registry/connection';
+import { RegistryLaunchControls } from './RegistryLaunchControls';
 import { clearRegistrySession, registryTransport, updateRegistryWorkspace as update, useRegistryWorkspace } from '@/lib/registry/workspace';
 import { RegistryArtifacts, type RegistryRelease } from '@/lib/registry/artifacts';
 import { exportRegistryModel } from '@/lib/registry/export-model';
@@ -90,7 +91,7 @@ export function RegistrySource({ expanded, navigationDisabled, onToggle, onBusyC
 
   useEffect(() => {
     const current = useRegistryWorkspace.getState();
-    if (current.session && current.models.length) return;
+    if (current.session?.openArtifact || (current.session && current.models.length)) return;
     const controller = new AbortController();
     void (async () => {
       try {
@@ -147,7 +148,7 @@ export function RegistrySource({ expanded, navigationDisabled, onToggle, onBusyC
           <span className="text-xs text-muted-foreground">{session.subject}</span>
           <Button size="sm" variant="ghost" disabled={busy} onClick={logout}>{t('registry.signOut')}</Button>
         </div>
-        {models.length ? <>
+        {session.openArtifact ? <RegistryLaunchControls transport={transport} busy={busy} run={operation => void run(operation)} /> : models.length ? <>
           <Label htmlFor={`${id}-model`}>{t('registry.model')}</Label>
           <select id={`${id}-model`} value={repository} disabled={busy} className="h-9 w-full min-w-0 rounded-md border bg-background px-2 text-sm" onChange={event => void run(signal => browseModel(event.target.value, signal))}>
             {models.map(model => <option key={model} value={model}>{modelTitles[model] || displayModel(model)}</option>)}

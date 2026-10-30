@@ -4,7 +4,7 @@
 
 import { RegistryError } from './protocol';
 
-export interface RegistryGrant { repositories: string[]; tags?: string[]; actions: ('pull' | 'push')[] }
+export interface RegistryGrant { repositories: string[]; tags?: string[]; digests?: string[]; actions: ('pull' | 'push')[] }
 
 export function parseGrants(value: unknown): RegistryGrant[] {
   if (!Array.isArray(value) || value.length > 128) throw new RegistryError('Invalid registry permissions.');
@@ -22,7 +22,13 @@ export function parseGrants(value: unknown): RegistryGrant[] {
       tags = rule.tags.map((t: unknown) => { if (typeof t !== 'string' || !/^[A-Za-z0-9_*][A-Za-z0-9_.*-]{0,127}$/.test(t)) throw new RegistryError('Invalid tag selector.'); return t; });
     }
     const actions = rule.actions.filter((a: unknown): a is 'pull' | 'push' => a === 'pull' || a === 'push');
-    return { repositories, tags, actions };
+    let digests: string[] | undefined;
+    if ('digests' in rule) {
+      if (tags || !Array.isArray(rule.digests) || !rule.digests.length || rule.digests.length > 4096 || actions.some(a => a !== 'pull') ||
+        !rule.digests.every((d: unknown) => typeof d === 'string' && /^sha256:[a-f0-9]{64}$/.test(d))) throw new RegistryError('Invalid digest permissions.');
+      digests = rule.digests;
+    }
+    return { repositories, tags, digests, actions };
   });
 }
 
@@ -53,5 +59,5 @@ export function repositoryMatches(pattern: string, repository: string): boolean 
 
 export function grantAllows(grants: RegistryGrant[], repository: string, action: 'pull' | 'push', tag?: string): boolean {
   return grants.some(g => g.actions.includes(action) && g.repositories.some(p => repositoryMatches(p, repository)) &&
-    (tag === undefined || g.tags === undefined || g.tags.some(t => wildcard(t, tag))));
+    (tag === undefined || (g.digests ? g.digests.includes(tag) : g.tags === undefined || g.tags.some(t => wildcard(t, tag)))));
 }

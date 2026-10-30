@@ -57,7 +57,8 @@ function manifest(bytes: Uint8Array): Manifest {
   if ('annotations' in value && value.annotations && typeof value.annotations === 'object') {
     for (const [key, item] of Object.entries(value.annotations)) if (typeof item === 'string') annotations[key] = item;
   }
-  return { schemaVersion: 2, mediaType: OCI_MANIFEST_TYPE, config: descriptor(value.config), layers: value.layers.map(descriptor), annotations };
+  return { schemaVersion: 2, mediaType: OCI_MANIFEST_TYPE, artifactType: 'artifactType' in value && typeof value.artifactType === 'string' ? value.artifactType : undefined,
+    config: descriptor(value.config), layers: value.layers.map(descriptor), annotations };
 }
 
 /** Plain IFC source inside an OCI artifact. Also reads a derived release's optional source/model.ifc. */
@@ -135,7 +136,11 @@ export class RegistryArtifacts {
   }
 
   async pull(repository: string, reference: string, signal?: AbortSignal): Promise<ReceivedIfc> {
+    if (this.transport.session?.openArtifact && !this.transport.can('pull', repository, reference)) throw new RegistryError('This opening request can read only the selected version.', 403);
     const { data, digest } = await this.readManifest(repository, reference, signal);
+    if (this.transport.session?.openArtifact && (data.artifactType !== IFC_ARTIFACT_TYPE || data.config.mediaType !== 'application/vnd.oci.empty.v1+json')) {
+      throw new RegistryError('This version does not match the registered IFC STEP profile.', 403);
+    }
     const candidates = data.layers.filter(layer =>
       layer.mediaType === 'application/x-step' || /\.ifc$/i.test(layer.annotations?.['org.opencontainers.image.title'] ?? ''));
     if (candidates.length !== 1) throw new RegistryError('Choose a release containing exactly one editable IFC source file.');
@@ -151,8 +156,11 @@ export class RegistryArtifacts {
   private async upload(repository: string, bytes: Uint8Array<ArrayBuffer>, mediaType: string, signal?: AbortSignal): Promise<Descriptor> {
     if (bytes.length > MAX_IFC_BYTES) throw new RegistryError('This local registry supports files up to 512 MiB.');
     const file = { mediaType, digest: await sha256(bytes), size: bytes.length };
-    const existing = await this.transport.request(this.transport.path(repository, `blobs/${file.digest}`), { method: 'HEAD', signal }, true);
-    if (existing.status !== 404) return file;
+    // A launch may publish to a destination it cannot read. Upload without probing those blobs.
+    if (this.transport.can('pull', repository, file.digest)) {
+      const existing = await this.transport.request(this.transport.path(repository, `blobs/${file.digest}`), { method: 'HEAD', signal }, true);
+      if (existing.status !== 404) return file;
+    }
     const start = await this.transport.request(this.transport.path(repository, 'blobs/uploads/'), { method: 'POST', signal });
     const location = start.headers.get('location');
     if (!location) throw new RegistryError('The registry did not return an upload location.');

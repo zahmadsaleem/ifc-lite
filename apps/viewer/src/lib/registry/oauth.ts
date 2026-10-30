@@ -9,7 +9,7 @@ import { exchangeRegistrySession, registryJsonReply, validateRegistrySessionConf
 export const REGISTRY_CALLBACK_PATH = '/oauth/registry/callback';
 const TIMEOUT_MS = 5 * 60 * 1000;
 
-export function validateRegistryOAuthConfig(value: unknown, registryOrigin: string, redirectUri: string): { clientId: string; authorizationEndpoint: string; sessionScope: string } {
+export function validateRegistryOAuthConfig(value: unknown, registryOrigin: string, redirectUri: string, memoryOnly = false): { clientId: string; authorizationEndpoint: string; sessionScope: string } {
   if (!value || typeof value !== 'object' || !('client_id' in value) || typeof value.client_id !== 'string' || !/^[A-Za-z0-9._~-]{1,128}$/.test(value.client_id) ||
     !('authorization_endpoint' in value) || typeof value.authorization_endpoint !== 'string' ||
     !('session_scope' in value) || typeof value.session_scope !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/.test(value.session_scope) || !('scoped_token_endpoint' in value) || value.scoped_token_endpoint !== '/token' ||
@@ -18,7 +18,7 @@ export function validateRegistryOAuthConfig(value: unknown, registryOrigin: stri
     !('redirect_uris' in value) || !Array.isArray(value.redirect_uris) || !value.redirect_uris.includes(redirectUri)) {
     throw new RegistryError('Registry browser sign-in is not configured for this viewer. Register its callback address with the registry.');
   }
-  validateRegistrySessionConfig(value);
+  validateRegistrySessionConfig(value, memoryOnly);
   const endpoint = new URL(value.authorization_endpoint);
   if (endpoint.origin !== new URL(registryOrigin).origin || endpoint.pathname !== '/oauth/authorize' || endpoint.username || endpoint.password || endpoint.search || endpoint.hash) {
     throw new RegistryError('The registry returned an unexpected sign-in address.');

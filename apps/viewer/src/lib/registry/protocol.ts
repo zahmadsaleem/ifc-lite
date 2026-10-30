@@ -3,6 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
 import { parseGrants, grantAllows, type RegistryGrant } from './grants';
+import type { OpenArtifactContext } from './open-artifact-contract';
 
 export class RegistryError extends Error {
   constructor(message: string, readonly status = 0) { super(message); }
@@ -10,6 +11,7 @@ export class RegistryError extends Error {
 
 export interface RegistryAccess { repository: string; actions: string[] }
 export interface RegistrySession {
+  openArtifact?: OpenArtifactContext;
   permissions?: RegistryGrant[];
   publicationHeaders?: { publisher: string; pushedAt: string };
   authorizationType?: 'session' | 'share' | 'access';

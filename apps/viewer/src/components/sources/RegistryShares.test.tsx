@@ -10,6 +10,11 @@ import { render, click, cleanup } from '@/test/render';
 import { installRegistryPopup, registryCallback, registryOAuthConfig, registryTokenReply } from '@/test/registry-oauth-fixture';
 import { RegistryTransport } from '@/lib/registry/transport';
 import { RegistryShares } from './RegistryShares';
+import { registerEnglish } from '@/i18n';
+import { registryEn } from '@/i18n/catalogues/registry.en';
+
+// The lazy RegistrySource parent registers these strings in the application.
+registerEnglish(registryEn);
 
 const originalFetch = globalThis.fetch; const cleanups: (() => void)[] = [];
 afterEach(async () => { await act(async () => cleanup()); cleanups.splice(0).reverse().forEach(f => f()); globalThis.fetch = originalFetch; });

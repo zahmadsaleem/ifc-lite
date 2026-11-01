@@ -7,7 +7,8 @@ import { ChevronDown, ChevronRight, Database } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { useTranslation } from '@/i18n';
+import { registerEnglish, useTranslation } from '@/i18n';
+import { registryEn } from '@/i18n/catalogues/registry.en';
 import { useViewerStore } from '@/store';
 import { useIfcLoader } from '@/hooks/useIfcLoader';
 import { sanitizeFilename } from '@/lib/export/download';
@@ -18,6 +19,8 @@ import { RegistryArtifacts, type RegistryRelease } from '@/lib/registry/artifact
 import { exportRegistryModel } from '@/lib/registry/export-model';
 import { RegistryShares } from './RegistryShares';
 import { RegistryPublication, RegistryReleaseDetails } from './RegistryReleaseDetails';
+
+registerEnglish(registryEn);
 
 interface RegistrySourceProps {
   expanded: boolean; navigationDisabled: boolean;

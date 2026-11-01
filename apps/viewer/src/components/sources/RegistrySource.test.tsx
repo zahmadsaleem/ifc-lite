@@ -11,12 +11,14 @@ import { SourceHostProvider } from '@/services/sources/SourceHostProvider';
 import { clearRegistrySession, useRegistryWorkspace } from '@/lib/registry/workspace';
 import { OCI_MANIFEST_TYPE, sha256 } from '@/lib/registry/artifacts';
 import { SourcesPanel } from './SourcesPanel';
+import { resolveEnglish } from '@/i18n/registry';
 import { installRegistryPopup, registryCallback, registryOAuthConfig, registryTokenReply } from '@/test/registry-oauth-fixture';
 const initialFetch = globalThis.fetch;
 
 async function mount(enabled = true): Promise<HTMLElement> {
   let ui!: HTMLElement;
   await act(async () => { ui = render(<SourceHostProvider><SourcesPanel onClose={() => {}} registryEnabled={enabled} /></SourceHostProvider>); });
+  if (enabled) await waitFor(() => Boolean(ui.textContent?.includes('Model registry (experimental)')), 'the lazy registry source should load');
   return ui;
 }
 function button(ui: HTMLElement, name: string): HTMLButtonElement {
@@ -29,6 +31,7 @@ afterEach(async () => { await act(async () => { cleanup(); clearRegistrySession(
 test('Model registry uses a registry sign-in action without viewer credentials (#8310)', async () => {
   const disabled = await mount(false);
   assert(!disabled.textContent?.includes('Model registry'));
+  assert.equal(resolveEnglish('registry.title'), 'registry.title', 'the disabled feature must not load its English catalogue (#8310)');
   cleanup();
   globalThis.fetch = async input => new URL(String(input)).pathname === '/oauth/config'
     ? Response.json(registryOAuthConfig('http://127.0.0.1:5000')) : Response.json({ error: 'invalid_grant' }, { status: 401 });

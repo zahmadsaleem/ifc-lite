@@ -2,13 +2,12 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
-import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
+import { lazy, Suspense, useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import type { ConnectionTestResult } from '@ifc-lite/plugin-api';
 import { useSourceHost } from '@/services/sources/SourceHostProvider';
 import { SourceSettingsDialog } from './SourceSettingsDialog';
 import { SourceBrowser } from './SourceBrowser';
 import { SourceProviderRow } from './SourceProviderRow';
-import { RegistrySource } from './RegistrySource';
 import { SourceFavouritesList } from './SourceFavouritesList';
 import { useSourceDownloadBatch } from './useSourceDownloadBatch';
 import type { SourceFavourite } from '@/lib/sources/favourites';
@@ -28,6 +27,8 @@ import {
   watchSourceRevisions,
   type SourceRevisionUpdate,
 } from '@/lib/sources/revisionWatch';
+
+const RegistrySource = lazy(() => import('./RegistrySource').then(module => ({ default: module.RegistrySource })));
 
 interface SourcesPanelProps {
   onClose: () => void;
@@ -321,8 +322,10 @@ export function SourcesPanel({ onClose, registryEnabled = import.meta.env?.VITE_
         />
 
         <ul className="space-y-2">
-          {registryEnabled && <RegistrySource expanded={browsing === 'oci-registry'} navigationDisabled={downloading} onBusyChange={setRegistryBusy}
-            onToggle={() => { if (navigationLock.current.busy) return; didAutoOpen.current = true; setBrowseTarget(null); setBrowsing(previous => previous === 'oci-registry' ? null : 'oci-registry'); }} />}
+          {registryEnabled && <Suspense fallback={null}>
+            <RegistrySource expanded={browsing === 'oci-registry'} navigationDisabled={downloading} onBusyChange={setRegistryBusy}
+              onToggle={() => { if (navigationLock.current.busy) return; didAutoOpen.current = true; setBrowseTarget(null); setBrowsing(previous => previous === 'oci-registry' ? null : 'oci-registry'); }} />
+          </Suspense>}
           {[...providers].sort((a, b) => Number(pins.ids.includes(b.manifest.name)) - Number(pins.ids.includes(a.manifest.name))).map((p) => (
             <SourceProviderRow
               key={p.manifest.name}
